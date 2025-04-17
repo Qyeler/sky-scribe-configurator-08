@@ -18,6 +18,7 @@ interface SurveyTabContentProps {
   onSubmitComplete: (contactData: ContactFormData, timingData: TimingData) => void;
   timingData: TimingData;
   setTimingData: React.Dispatch<React.SetStateAction<TimingData>>;
+  filledByAI: boolean;
 }
 
 const SurveyTabContent: React.FC<SurveyTabContentProps> = ({ 
@@ -26,7 +27,8 @@ const SurveyTabContent: React.FC<SurveyTabContentProps> = ({
   selectedTags,
   onSubmitComplete,
   timingData,
-  setTimingData
+  setTimingData,
+  filledByAI
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState(1);
@@ -145,41 +147,44 @@ const SurveyTabContent: React.FC<SurveyTabContentProps> = ({
     setShowContactForm(false);
   };
   
-  // Заполнение значений по умолчанию для не отвеченных вопросов
+  // Заполнение значений по умолчанию для не отвеченных вопросов, срабатывает только если не было заполнения через AI
   const fillDefaultValues = () => {
-    const newResponses = { ...responses };
-    
-    // Проходим по всем вопросам и заполняем пропущенные
-    surveyQuestions.forEach(question => {
-      // Если на вопрос не ответили
-      if (!newResponses[question.id]) {
-        if (question.options.length > 0) {
-          // Ищем опцию "нет" или подобную
-          const defaultOption = question.options.find(opt => 
-            opt.text.toLowerCase().includes('нет') || 
-            opt.text.toLowerCase().includes('не требуется') ||
-            opt.text.toLowerCase().includes('стандартный')
-          );
-          
-          if (defaultOption) {
-            if (question.multiple) {
-              newResponses[question.id] = [defaultOption.value];
+    // Только если не происходило заполнения через AI
+    if (!filledByAI) {
+      const newResponses = { ...responses };
+      
+      // Проходим по всем вопросам и заполняем пропущенные
+      surveyQuestions.forEach(question => {
+        // Если на вопрос не ответили
+        if (!newResponses[question.id]) {
+          if (question.options.length > 0) {
+            // Ищем опцию "нет" или подобную
+            const defaultOption = question.options.find(opt => 
+              opt.text.toLowerCase().includes('нет') || 
+              opt.text.toLowerCase().includes('не требуется') ||
+              opt.text.toLowerCase().includes('стандартный')
+            );
+            
+            if (defaultOption) {
+              if (question.multiple) {
+                newResponses[question.id] = [defaultOption.value];
+              } else {
+                newResponses[question.id] = defaultOption.value;
+              }
             } else {
-              newResponses[question.id] = defaultOption.value;
-            }
-          } else {
-            // Если нет подходящей опции, берем первую
-            if (question.multiple) {
-              newResponses[question.id] = [question.options[0].value];
-            } else {
-              newResponses[question.id] = question.options[0].value;
+              // Если нет подходящей опции, берем первую
+              if (question.multiple) {
+                newResponses[question.id] = [question.options[0].value];
+              } else {
+                newResponses[question.id] = question.options[0].value;
+              }
             }
           }
         }
-      }
-    });
-    
-    setResponses(newResponses);
+      });
+      
+      setResponses(newResponses);
+    }
   };
   
   // Check if the current section has required questions that are not answered

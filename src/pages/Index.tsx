@@ -56,6 +56,12 @@ const Index = () => {
     questionTimings: {}
   });
   
+  // Флаг, указывающий что форма была заполнена через AI
+  const [filledByAI, setFilledByAI] = useState(false);
+  
+  // Флаг, указывающий что идет процесс заполнения формы
+  const [isFillingForm, setIsFillingForm] = useState(false);
+  
   const { toast } = useToast();
   
   // Обработчик выбора "Да" в диалоге помощи
@@ -91,6 +97,8 @@ const Index = () => {
   // Функция для автоматического заполнения опроса на основе тегов
   const handleTagsIdentified = (tags: string[]) => {
     setSelectedTags(tags);
+    setFilledByAI(true);
+    setIsFillingForm(true);
     
     // Задержка для эффекта "автоматического заполнения"
     const fillResponses = async () => {
@@ -102,6 +110,7 @@ const Index = () => {
       for (const question of surveyQuestions) {
         // Проверяем, есть ли в опциях вопроса теги из selectedTags
         const matchingOptions = question.options.filter(option => {
+          if (!option.value) return false; // Skip empty values
           const optionValues = option.value.split(',');
           return optionValues.some(val => tags.includes(val.trim()));
         });
@@ -128,7 +137,7 @@ const Index = () => {
       
       // Заполняем вопросы, на которые не было найдено ответа, значениями по умолчанию
       for (const question of surveyQuestions) {
-        if (!filledQuestions.includes(question.id)) {
+        if (!filledQuestions.includes(question.id) && question.options.length > 0) {
           // Находим опцию "нет", "стандартный" или другую для дефолтных значений
           const defaultOption = question.options.find(opt => 
             opt.text.toLowerCase().includes('нет') || 
@@ -142,14 +151,14 @@ const Index = () => {
             (question.options.length > 0 ? question.options[0] : null);
           
           if (optionToUse) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay += 300;
+            
             if (question.multiple) {
               newResponses[question.id] = [optionToUse.value];
             } else {
               newResponses[question.id] = optionToUse.value;
             }
-            
-            await new Promise(resolve => setTimeout(resolve, delay));
-            delay += 300;
             
             // Обновляем состояние для визуального эффекта
             setResponses({ ...newResponses });
@@ -160,6 +169,7 @@ const Index = () => {
       // После заполнения всех ответов показываем опрос
       setShowSurvey(true);
       setShowAI(false);
+      setIsFillingForm(false);
       
       // Записываем время окончания общения с ИИ
       const newTimingData = { ...timingData };
@@ -271,24 +281,31 @@ const Index = () => {
           const options = question.options.filter(opt => opt.value === value);
           options.forEach(opt => {
             // Добавляем все теги из значения опции
-            opt.value.split(',').forEach(tag => {
+            if (opt.value) {
+              opt.value.split(',').forEach(tag => {
+                const trimmedTag = tag.trim();
+                if (trimmedTag && !tags.includes(trimmedTag)) {
+                  tags.push(trimmedTag);
+                }
+              });
+            }
+          });
+        });
+      } else if (typeof answer === 'string') {
+        // Для текстовых полей (additional_requirements)
+        if (questionId === 'additional_requirements') {
+          // Нет тегов для текстового поля
+        } else {
+          // Для одиночного выбора
+          const option = question.options.find(opt => opt.value === answer);
+          if (option && option.value) {
+            option.value.split(',').forEach(tag => {
               const trimmedTag = tag.trim();
               if (trimmedTag && !tags.includes(trimmedTag)) {
                 tags.push(trimmedTag);
               }
             });
-          });
-        });
-      } else {
-        // Для одиночного выбора
-        const option = question.options.find(opt => opt.value === answer);
-        if (option) {
-          option.value.split(',').forEach(tag => {
-            const trimmedTag = tag.trim();
-            if (trimmedTag && !tags.includes(trimmedTag)) {
-              tags.push(trimmedTag);
-            }
-          });
+          }
         }
       }
     });
@@ -341,7 +358,7 @@ const Index = () => {
           </div>
         )}
         
-        {showSurvey && (
+        {(showSurvey || isFillingForm) && (
           <div className="space-y-8">
             <SurveyTabContent 
               responses={responses}
@@ -350,6 +367,7 @@ const Index = () => {
               onSubmitComplete={handleSubmitContactForm}
               timingData={timingData}
               setTimingData={setTimingData}
+              filledByAI={filledByAI}
             />
             
             {costEstimate && contactData && (
@@ -370,7 +388,7 @@ const Index = () => {
         )}
       </main>
       
-      {showSurvey && (
+      {showSurvey && !isFillingForm && (
         <FloatingAssistantButton 
           onTagsIdentified={handleTagsIdentified}
           initialMessages={aiMessages}

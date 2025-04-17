@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SurveyQuestion as SurveyQuestionType, SurveyOption, OptionValue } from "@/types/survey";
+import { Textarea } from "@/components/ui/textarea";
 
 interface SurveyQuestionProps {
   question: SurveyQuestionType;
@@ -39,6 +40,13 @@ const SurveyQuestion: React.FC<SurveyQuestionProps> = ({
     onChange(question.id, newValues);
   };
 
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(question.id, e.target.value);
+  };
+
+  // Check if this is the "Дополнительные требования к комплектации" question
+  const isAdditionalRequirements = question.id === "additional_requirements";
+
   return (
     <div className="mb-6 bg-white p-4 rounded-lg border shadow-sm">
       <div className="flex items-start mb-3">
@@ -59,7 +67,15 @@ const SurveyQuestion: React.FC<SurveyQuestionProps> = ({
         )}
       </div>
 
-      {question.multiple ? (
+      {isAdditionalRequirements ? (
+        // Render textarea for additional requirements
+        <Textarea
+          value={value as string || ''}
+          onChange={handleTextareaChange}
+          placeholder="Введите дополнительные требования к комплектации..."
+          className="w-full min-h-[100px]"
+        />
+      ) : question.multiple ? (
         // Checkboxes for multiple selection
         <div className="space-y-3">
           {question.options.map((option) => (

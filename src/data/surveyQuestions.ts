@@ -206,6 +206,12 @@ export const surveyQuestions: SurveyQuestion[] = [
       { id: "wind_speed_1", text: "До 10 м/с", value: "условия_ветер_до_10мс" },
       { id: "wind_speed_2", text: "Более 10 м/с", value: "условия_ветер_более_10мс" }
     ]
+  },
+  {
+    id: "additional_requirements",
+    text: "6.1. Дополнительные требования к комплектации:",
+    section: 6,
+    options: [],  // Empty options since this will be a textarea
+    required: false
   }
-  // More questions could be added but I'm keeping it concise for now
 ];
