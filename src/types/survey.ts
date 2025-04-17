@@ -31,3 +31,18 @@ export interface SurveySection {
 export interface SurveyResponse {
   [questionId: string]: OptionValue | OptionValue[];
 }
+
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AIResponse {
+  searchParamIDs: string[];
+  message: string;
+}
+
+export interface ProductEstimate {
+  minCost: number;
+  maxCost: number;
+}
