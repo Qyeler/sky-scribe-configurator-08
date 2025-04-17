@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Send, Bot, Loader2 } from "lucide-react";
@@ -73,6 +73,15 @@ const AIAssistant: React.FC<AIAssistantProps> = ({
   );
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  
+  // Синхронизируем изменения сообщений наружу через эффект
+  useEffect(() => {
+    if (initialMessages && JSON.stringify(initialMessages) !== JSON.stringify(messages)) {
+      // Обновить внешний массив сообщений
+      const messagesUpdateEvent = new CustomEvent('ai-messages-updated', { detail: messages });
+      window.dispatchEvent(messagesUpdateEvent);
+    }
+  }, [messages, initialMessages]);
   
   const apiKey = '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';
   const url = 'https://api.openai.com/v1/chat/completions';

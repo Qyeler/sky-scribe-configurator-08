@@ -46,3 +46,10 @@ export interface ProductEstimate {
   minCost: number;
   maxCost: number;
 }
+
+export interface ContactFormData {
+  fullName: string;
+  email: string;
+  phone: string;
+  additionalInfo: string;
+}

@@ -3,12 +3,17 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { MessageSquare } from 'lucide-react';
 import AIAssistant from './AIAssistant';
+import { Message } from '@/types/survey';
 
 interface FloatingAssistantButtonProps {
   onTagsIdentified: (tags: string[]) => void;
+  initialMessages?: Message[];
 }
 
-const FloatingAssistantButton: React.FC<FloatingAssistantButtonProps> = ({ onTagsIdentified }) => {
+const FloatingAssistantButton: React.FC<FloatingAssistantButtonProps> = ({ 
+  onTagsIdentified,
+  initialMessages 
+}) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleAssistant = () => {
@@ -22,6 +27,7 @@ const FloatingAssistantButton: React.FC<FloatingAssistantButtonProps> = ({ onTag
           <AIAssistant 
             onTagsIdentified={onTagsIdentified} 
             floatingMode={true}
+            initialMessages={initialMessages}
             onClose={() => setIsOpen(false)}
           />
         </div>

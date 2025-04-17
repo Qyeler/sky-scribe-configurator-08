@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { MessageSquare, List } from "lucide-react";
 import Logo from "@/components/Logo";
-import { SurveyResponse, ProductEstimate } from "@/types/survey";
+import { SurveyResponse, ProductEstimate, ContactFormData, Message } from "@/types/survey";
 import AIAssistant from "@/components/AIAssistant";
 import SurveyTabContent from "@/components/SurveyTabContent";
 import HelpDialog from "@/components/HelpDialog";
@@ -35,15 +35,21 @@ const Index = () => {
   // Состояние загрузки для генерации документа
   const [isGeneratingDoc, setIsGeneratingDoc] = useState(false);
   
-  const { toast } = useToast();
-  
-  // Эффект для обновления оценки стоимости при изменении выбранных тегов
-  useEffect(() => {
-    if (selectedTags.length > 0) {
-      const estimate = generateCostEstimate(selectedTags);
-      setCostEstimate(estimate);
+  // Состояние для хранения истории сообщений ИИ
+  const [aiMessages, setAiMessages] = useState<Message[]>([
+    {
+      role: 'assistant',
+      content: 'Здравствуйте! Я помощник для подбора БАС. Опишите ваши требования, и я помогу подобрать оптимальную конфигурацию оборудования.'
     }
-  }, [selectedTags]);
+  ]);
+  
+  // Состояние для отображения контактной формы
+  const [showContactForm, setShowContactForm] = useState(false);
+  
+  // Состояние для хранения данных контактной формы
+  const [contactData, setContactData] = useState<ContactFormData | null>(null);
+  
+  const { toast } = useToast();
   
   // Обработчик выбора "Да" в диалоге помощи
   const handleAcceptHelp = () => {
@@ -65,6 +71,7 @@ const Index = () => {
     const fillResponses = async () => {
       const newResponses = { ...responses };
       let delay = 300; // Начальная задержка
+      const filledQuestions: string[] = [];
       
       // Для каждого вопроса в опросе
       for (const question of surveyQuestions) {
@@ -87,13 +94,47 @@ const Index = () => {
             newResponses[question.id] = matchingOptions[0].value;
           }
           
+          filledQuestions.push(question.id);
+          
           // Обновляем ответы с каждым выбором для визуального эффекта
           setResponses({ ...newResponses });
         }
       }
       
+      // Заполняем вопросы, на которые не было найдено ответа, значениями по умолчанию
+      for (const question of surveyQuestions) {
+        if (!filledQuestions.includes(question.id)) {
+          // Находим опцию "нет", "стандартный" или другую для дефолтных значений
+          const defaultOption = question.options.find(opt => 
+            opt.text.toLowerCase().includes('нет') || 
+            opt.text.toLowerCase().includes('не требуется') ||
+            opt.text.toLowerCase().includes('стандартный') ||
+            opt.text.toLowerCase().includes('до') // Часто первая опция для числовых диапазонов
+          );
+          
+          // Если не нашли дефолтную опцию, берем первую
+          const optionToUse = defaultOption || 
+            (question.options.length > 0 ? question.options[0] : null);
+          
+          if (optionToUse) {
+            if (question.multiple) {
+              newResponses[question.id] = [optionToUse.value];
+            } else {
+              newResponses[question.id] = optionToUse.value;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay += 300;
+            
+            // Обновляем состояние для визуального эффекта
+            setResponses({ ...newResponses });
+          }
+        }
+      }
+      
       // После заполнения всех ответов показываем опрос
       setShowSurvey(true);
+      setShowAI(false);
       
       toast({
         title: "Заполнение завершено",
@@ -106,10 +147,26 @@ const Index = () => {
   
   // Функция для создания и скачивания документа
   const handleCreateDocument = async () => {
+    if (!contactData) {
+      toast({
+        title: "Ошибка",
+        description: "Необходимо заполнить контактную информацию",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsGeneratingDoc(true);
     try {
-      const result = await generateDocument(selectedTags);
+      console.log("Отправка на бэкенд:", { 
+        tags: selectedTags, 
+        contact: contactData,
+        responses
+      });
+      
+      const result = await generateDocument(selectedTags, contactData);
       downloadDocument(result, "drone_specification.docx");
+      
       toast({
         title: "Документ создан",
         description: "Спецификация дрона успешно скачана.",
@@ -125,8 +182,40 @@ const Index = () => {
     }
   };
   
+  // Обработчик отправки контактной формы
+  const handleSubmitContactForm = (data: ContactFormData) => {
+    setContactData(data);
+    
+    // Теперь генерируем смету
+    const estimate = generateCostEstimate(selectedTags);
+    setCostEstimate(estimate);
+    
+    console.log("Контактные данные:", data);
+    console.log("Расчет стоимости:", estimate);
+    
+    toast({
+      title: "Данные сохранены",
+      description: "Контактная информация сохранена. Теперь вы можете создать спецификацию.",
+    });
+  };
+  
+  // Слушатель для обновлений сообщений из компонента AI Assistant
+  useEffect(() => {
+    const handleMessagesUpdate = (event: CustomEvent) => {
+      setAiMessages(event.detail);
+    };
+    
+    window.addEventListener('ai-messages-updated', handleMessagesUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('ai-messages-updated', handleMessagesUpdate as EventListener);
+    };
+  }, []);
+  
   // Обновление выбранных тегов при изменении ответов
   useEffect(() => {
+    if (!showSurvey) return;
+    
     const tags: string[] = [];
     
     Object.entries(responses).forEach(([questionId, answer]) => {
@@ -164,7 +253,7 @@ const Index = () => {
     });
     
     setSelectedTags(tags);
-  }, [responses]);
+  }, [responses, showSurvey]);
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -194,7 +283,10 @@ const Index = () => {
               ИИ-помощник для подбора БАС
             </h2>
             
-            <AIAssistant onTagsIdentified={handleTagsIdentified} />
+            <AIAssistant 
+              onTagsIdentified={handleTagsIdentified}
+              initialMessages={aiMessages}
+            />
           </div>
         )}
         
@@ -203,9 +295,11 @@ const Index = () => {
             <SurveyTabContent 
               responses={responses}
               setResponses={setResponses}
+              selectedTags={selectedTags}
+              onSubmitComplete={handleSubmitContactForm}
             />
             
-            {costEstimate && (
+            {costEstimate && contactData && (
               <div className="mt-8">
                 <CostEstimate estimate={costEstimate} />
                 
@@ -224,7 +318,10 @@ const Index = () => {
       </main>
       
       {showSurvey && (
-        <FloatingAssistantButton onTagsIdentified={handleTagsIdentified} />
+        <FloatingAssistantButton 
+          onTagsIdentified={handleTagsIdentified}
+          initialMessages={aiMessages}
+        />
       )}
     </div>
   );

@@ -2,14 +2,23 @@
 import { ProductEstimate } from '@/types/survey';
 
 // Функция для создания docx документа
-export const generateDocument = async (items: string[]): Promise<Blob> => {
+export const generateDocument = async (items: string[], contactData?: any): Promise<Blob> => {
   try {
+    const requestBody = {
+      items,
+      contactData
+    };
+    
+    // Логирование запроса для дебага
+    console.log("Отправка запроса на:", "http://127.0.0.1:8000/app1/generate_docx/");
+    console.log("Данные запроса:", JSON.stringify(requestBody));
+    
     const response = await fetch("http://127.0.0.1:8000/app1/generate_docx/", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

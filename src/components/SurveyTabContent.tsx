@@ -1,19 +1,33 @@
 
 import React, { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { SurveyResponse } from '@/types/survey';
+import { SurveyResponse, ContactFormData } from '@/types/survey';
 import { surveyQuestions, surveySections } from '@/data/surveyQuestions';
 import SurveySection from '@/components/SurveySection';
 import SurveyProgress from '@/components/SurveyProgress';
 import SurveyNavigation from '@/components/SurveyNavigation';
+import ContactForm from '@/components/ContactForm';
+import CostEstimate from '@/components/CostEstimate';
+import { generateCostEstimate } from '@/services/productService';
 
-const SurveyTabContent: React.FC<{
+interface SurveyTabContentProps {
   responses: SurveyResponse;
   setResponses: React.Dispatch<React.SetStateAction<SurveyResponse>>;
-}> = ({ responses, setResponses }) => {
+  selectedTags: string[];
+  onSubmitComplete: (contactData: ContactFormData) => void;
+}
+
+const SurveyTabContent: React.FC<SurveyTabContentProps> = ({ 
+  responses, 
+  setResponses,
+  selectedTags,
+  onSubmitComplete 
+}) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [costEstimate, setCostEstimate] = useState(null);
   
   // Filter questions for the current section
   const currentSectionQuestions = surveyQuestions.filter(q => q.section === activeSection);
@@ -36,12 +50,20 @@ const SurveyTabContent: React.FC<{
       setActiveSection(nextSection);
       window.scrollTo(0, 0);
     } else {
-      handleSubmitSurvey();
+      // Если завершили опрос, рассчитываем стоимость и показываем контактную форму
+      const estimate = generateCostEstimate(selectedTags);
+      setCostEstimate(estimate);
+      setShowContactForm(true);
     }
   };
   
   // Navigate to the previous survey section
   const handlePreviousSection = () => {
+    if (showContactForm) {
+      setShowContactForm(false);
+      return;
+    }
+    
     const prevSection = activeSection - 1;
     if (prevSection >= 1) {
       setActiveSection(prevSection);
@@ -49,19 +71,67 @@ const SurveyTabContent: React.FC<{
     }
   };
   
-  // Submit the survey
-  const handleSubmitSurvey = () => {
+  // Handle form submission
+  const handleContactFormSubmit = (contactData: ContactFormData) => {
     setIsSubmitting(true);
     
-    // In a real implementation, you would send the responses to a server
-    // For now, we'll just simulate this with a delay
+    // Логируем отправляемые данные
+    console.log("Отправка заявки с данными:", {
+      contact: contactData,
+      responses,
+      tags: selectedTags
+    });
+    
+    // Имитация отправки на сервер
     setTimeout(() => {
       toast({
         title: "Запрос отправлен",
         description: "Специалист свяжется с вами в ближайшее время",
       });
       setIsSubmitting(false);
+      onSubmitComplete(contactData);
     }, 1500);
+  };
+  
+  const handleContactFormCancel = () => {
+    setShowContactForm(false);
+  };
+  
+  // Заполнение значений по умолчанию для не отвеченных вопросов
+  const fillDefaultValues = () => {
+    const newResponses = { ...responses };
+    
+    // Проходим по всем вопросам и заполняем пропущенные
+    surveyQuestions.forEach(question => {
+      // Если на вопрос не ответили
+      if (!newResponses[question.id]) {
+        if (question.options.length > 0) {
+          // Ищем опцию "нет" или подобную
+          const defaultOption = question.options.find(opt => 
+            opt.text.toLowerCase().includes('нет') || 
+            opt.text.toLowerCase().includes('не требуется') ||
+            opt.text.toLowerCase().includes('стандартный')
+          );
+          
+          if (defaultOption) {
+            if (question.multiple) {
+              newResponses[question.id] = [defaultOption.value];
+            } else {
+              newResponses[question.id] = defaultOption.value;
+            }
+          } else {
+            // Если нет подходящей опции, берем первую
+            if (question.multiple) {
+              newResponses[question.id] = [question.options[0].value];
+            } else {
+              newResponses[question.id] = question.options[0].value;
+            }
+          }
+        }
+      }
+    });
+    
+    setResponses(newResponses);
   };
   
   // Check if the current section has required questions that are not answered
@@ -94,27 +164,44 @@ const SurveyTabContent: React.FC<{
   return (
     <div className="space-y-8">
       <SurveyProgress 
-        currentSection={activeSection} 
-        totalSections={surveySections.length} 
+        currentSection={showContactForm ? surveySections.length + 1 : activeSection} 
+        totalSections={surveySections.length + 1} 
       />
       
-      {currentSection && (
+      {showContactForm ? (
+        <div className="space-y-6">
+          {costEstimate && (
+            <CostEstimate estimate={costEstimate} />
+          )}
+          
+          <ContactForm
+            onSubmit={handleContactFormSubmit}
+            onCancel={handleContactFormCancel}
+          />
+        </div>
+      ) : currentSection ? (
         <SurveySection
           section={currentSection}
           questions={currentSectionQuestions}
           responses={responses}
           onQuestionChange={handleQuestionChange}
         />
-      )}
+      ) : null}
       
-      <SurveyNavigation 
-        onPrevious={handlePreviousSection}
-        onNext={handleNextSection}
-        isPreviousDisabled={activeSection === 1}
-        isNextDisabled={currentSectionHasUnansweredRequired() || isSubmitting}
-        isLastSection={isLastSection}
-        isSubmitting={isSubmitting}
-      />
+      {!showContactForm && (
+        <SurveyNavigation 
+          onPrevious={handlePreviousSection}
+          onNext={() => {
+            // Перед переходом на следующий шаг, заполняем значения по умолчанию для текущей секции
+            fillDefaultValues();
+            handleNextSection();
+          }}
+          isPreviousDisabled={activeSection === 1}
+          isNextDisabled={currentSectionHasUnansweredRequired() || isSubmitting}
+          isLastSection={isLastSection}
+          isSubmitting={isSubmitting}
+        />
+      )}
     </div>
   );
 };
