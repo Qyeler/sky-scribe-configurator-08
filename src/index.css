@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,10 +14,10 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 210 79% 46%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 210 40% 90%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
@@ -32,7 +33,7 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
 
@@ -97,5 +98,17 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  .uas-card {
+    @apply flex flex-col p-5 rounded-xl border border-border transition-all hover:shadow-md;
+  }
+
+  .uas-scenario-btn {
+    @apply flex flex-col items-center justify-center text-center p-4 rounded-xl border border-border transition-all hover:bg-blue-50;
+  }
+
+  .uas-scenario-btn.active {
+    @apply border-blue-500 bg-blue-50;
   }
 }
