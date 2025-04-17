@@ -12,7 +12,7 @@ const HelpDialog: React.FC<HelpDialogProps> = ({ onAccept, onDecline }) => {
   return (
     <div className="bg-white p-5 rounded-lg shadow-lg max-w-md mx-auto">
       <h3 className="text-xl text-center font-medium mb-4">
-        Вам нужна помощь в подаче заявки?
+        Вам нужна помощь ИИ в подаче заявки?
       </h3>
       <div className="space-y-2 mb-6">
         <div className="flex items-start">

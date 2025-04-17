@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { SurveyResponse, ContactFormData } from '@/types/survey';
+import { TimingData } from '@/types/analytics';
 import { surveyQuestions, surveySections } from '@/data/surveyQuestions';
 import SurveySection from '@/components/SurveySection';
 import SurveyProgress from '@/components/SurveyProgress';
@@ -14,20 +15,25 @@ interface SurveyTabContentProps {
   responses: SurveyResponse;
   setResponses: React.Dispatch<React.SetStateAction<SurveyResponse>>;
   selectedTags: string[];
-  onSubmitComplete: (contactData: ContactFormData) => void;
+  onSubmitComplete: (contactData: ContactFormData, timingData: TimingData) => void;
+  timingData: TimingData;
+  setTimingData: React.Dispatch<React.SetStateAction<TimingData>>;
 }
 
 const SurveyTabContent: React.FC<SurveyTabContentProps> = ({ 
   responses, 
   setResponses,
   selectedTags,
-  onSubmitComplete 
+  onSubmitComplete,
+  timingData,
+  setTimingData
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
   const [costEstimate, setCostEstimate] = useState(null);
+  const [currentQuestionStartTime, setCurrentQuestionStartTime] = useState<number>(Date.now());
   
   // Filter questions for the current section
   const currentSectionQuestions = surveyQuestions.filter(q => q.section === activeSection);
@@ -35,8 +41,39 @@ const SurveyTabContent: React.FC<SurveyTabContentProps> = ({
   // Find the current section
   const currentSection = surveySections.find(s => s.id === activeSection);
   
-  // Handle question responses
+  // Record timing when changing sections or answering questions
+  useEffect(() => {
+    // Mark the start time for this section's questions
+    setCurrentQuestionStartTime(Date.now());
+  }, [activeSection]);
+  
+  // Handle question responses and track time spent
   const handleQuestionChange = (id: string, value: string | string[]) => {
+    // Record end time for the current question
+    const endTime = Date.now();
+    const newTimingData = { ...timingData };
+    
+    // If we already have a start time for this question, update it
+    if (newTimingData.questionTimings[id]) {
+      newTimingData.questionTimings[id].endTime = endTime;
+      newTimingData.questionTimings[id].duration = 
+        endTime - newTimingData.questionTimings[id].startTime;
+    } else {
+      // Initialize timing data for this question
+      newTimingData.questionTimings[id] = {
+        startTime: currentQuestionStartTime,
+        endTime: endTime,
+        duration: endTime - currentQuestionStartTime
+      };
+    }
+    
+    // Update timing data
+    setTimingData(newTimingData);
+    
+    // Reset the start time for the next question
+    setCurrentQuestionStartTime(endTime);
+    
+    // Update responses
     setResponses(prev => ({
       ...prev,
       [id]: value
@@ -50,7 +87,13 @@ const SurveyTabContent: React.FC<SurveyTabContentProps> = ({
       setActiveSection(nextSection);
       window.scrollTo(0, 0);
     } else {
-      // Если завершили опрос, рассчитываем стоимость и показываем контактную форму
+      // Calculate end time and show contact form
+      const endTime = Date.now();
+      const newTimingData = { ...timingData };
+      newTimingData.totalSurveyTime = endTime - timingData.sessionStart;
+      setTimingData(newTimingData);
+      
+      // Generate the cost estimate and show contact form
       const estimate = generateCostEstimate(selectedTags);
       setCostEstimate(estimate);
       setShowContactForm(true);
@@ -75,11 +118,16 @@ const SurveyTabContent: React.FC<SurveyTabContentProps> = ({
   const handleContactFormSubmit = (contactData: ContactFormData) => {
     setIsSubmitting(true);
     
+    // Record the final timing data
+    const finalTimingData = { ...timingData };
+    finalTimingData.totalSurveyTime = Date.now() - timingData.sessionStart;
+    
     // Логируем отправляемые данные
     console.log("Отправка заявки с данными:", {
       contact: contactData,
       responses,
-      tags: selectedTags
+      tags: selectedTags,
+      timingData: finalTimingData
     });
     
     // Имитация отправки на сервер
@@ -89,7 +137,7 @@ const SurveyTabContent: React.FC<SurveyTabContentProps> = ({
         description: "Специалист свяжется с вами в ближайшее время",
       });
       setIsSubmitting(false);
-      onSubmitComplete(contactData);
+      onSubmitComplete(contactData, finalTimingData);
     }, 1500);
   };
   

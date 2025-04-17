@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { MessageSquare, List } from "lucide-react";
 import Logo from "@/components/Logo";
 import { SurveyResponse, ProductEstimate, ContactFormData, Message } from "@/types/survey";
+import { TimingData } from "@/types/analytics";
 import AIAssistant from "@/components/AIAssistant";
 import SurveyTabContent from "@/components/SurveyTabContent";
 import HelpDialog from "@/components/HelpDialog";
@@ -49,18 +50,42 @@ const Index = () => {
   // Состояние для хранения данных контактной формы
   const [contactData, setContactData] = useState<ContactFormData | null>(null);
   
+  // Состояние для хранения данных о времени заполнения
+  const [timingData, setTimingData] = useState<TimingData>({
+    sessionStart: Date.now(),
+    questionTimings: {}
+  });
+  
   const { toast } = useToast();
   
   // Обработчик выбора "Да" в диалоге помощи
   const handleAcceptHelp = () => {
     setShowHelpDialog(false);
     setShowAI(true);
+    
+    // Записываем время начала общения с ИИ
+    const newTimingData = { ...timingData };
+    newTimingData.aiChatDuration = 0; // Будет увеличиваться
+    setTimingData(newTimingData);
   };
   
   // Обработчик выбора "Нет" в диалоге помощи
   const handleDeclineHelp = () => {
     setShowHelpDialog(false);
     setShowSurvey(true);
+  };
+  
+  // Обработчик минимизации ИИ помощника
+  const handleMinimizeAI = () => {
+    setShowAI(false);
+    setShowSurvey(true);
+    
+    // Записываем время окончания общения с ИИ
+    const newTimingData = { ...timingData };
+    if (newTimingData.aiChatDuration !== undefined) {
+      newTimingData.aiChatDuration = Date.now() - timingData.sessionStart;
+    }
+    setTimingData(newTimingData);
   };
   
   // Функция для автоматического заполнения опроса на основе тегов
@@ -136,6 +161,13 @@ const Index = () => {
       setShowSurvey(true);
       setShowAI(false);
       
+      // Записываем время окончания общения с ИИ
+      const newTimingData = { ...timingData };
+      if (newTimingData.aiChatDuration !== undefined) {
+        newTimingData.aiChatDuration = Date.now() - timingData.sessionStart;
+      }
+      setTimingData(newTimingData);
+      
       toast({
         title: "Заполнение завершено",
         description: "Анкета предварительно заполнена на основе вашего запроса.",
@@ -158,10 +190,15 @@ const Index = () => {
     
     setIsGeneratingDoc(true);
     try {
+      // Обновляем timing data перед отправкой
+      const finalTimingData = { ...timingData };
+      finalTimingData.totalSurveyTime = Date.now() - timingData.sessionStart;
+      
       console.log("Отправка на бэкенд:", { 
         tags: selectedTags, 
         contact: contactData,
-        responses
+        responses,
+        timingData: finalTimingData
       });
       
       const result = await generateDocument(selectedTags, contactData);
@@ -183,8 +220,11 @@ const Index = () => {
   };
   
   // Обработчик отправки контактной формы
-  const handleSubmitContactForm = (data: ContactFormData) => {
+  const handleSubmitContactForm = (data: ContactFormData, finalTimingData: TimingData) => {
     setContactData(data);
+    
+    // Обновляем финальные данные о времени
+    setTimingData(finalTimingData);
     
     // Теперь генерируем смету
     const estimate = generateCostEstimate(selectedTags);
@@ -192,6 +232,7 @@ const Index = () => {
     
     console.log("Контактные данные:", data);
     console.log("Расчет стоимости:", estimate);
+    console.log("Данные о времени:", finalTimingData);
     
     toast({
       title: "Данные сохранены",
@@ -279,9 +320,19 @@ const Index = () => {
         
         {showAI && !showSurvey && (
           <div className="bg-white rounded-xl border shadow-sm p-6 min-h-[70vh] flex flex-col">
-            <h2 className="text-xl font-medium mb-4 pb-2 border-b">
-              ИИ-помощник для подбора БАС
-            </h2>
+            <div className="flex justify-between items-center mb-4 pb-2 border-b">
+              <h2 className="text-xl font-medium">
+                ИИ-помощник для подбора БАС
+              </h2>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={handleMinimizeAI}
+                title="Свернуть ИИ и перейти к самостоятельному заполнению"
+              >
+                <Minimize size={18} />
+              </Button>
+            </div>
             
             <AIAssistant 
               onTagsIdentified={handleTagsIdentified}
@@ -297,6 +348,8 @@ const Index = () => {
               setResponses={setResponses}
               selectedTags={selectedTags}
               onSubmitComplete={handleSubmitContactForm}
+              timingData={timingData}
+              setTimingData={setTimingData}
             />
             
             {costEstimate && contactData && (
@@ -321,6 +374,7 @@ const Index = () => {
         <FloatingAssistantButton 
           onTagsIdentified={handleTagsIdentified}
           initialMessages={aiMessages}
+          onMinimize={() => setShowSurvey(true)}
         />
       )}
     </div>
