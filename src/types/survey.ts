@@ -15,6 +15,7 @@ export interface SurveyQuestion {
   options: SurveyOption[];
   multiple?: boolean;
   required?: boolean;
+  additionalInfo?: string;
   skipLogic?: {
     dependsOn: string;
     showWhen: OptionValue[];
