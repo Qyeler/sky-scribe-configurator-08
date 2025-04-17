@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { MessageSquare, List } from "lucide-react";
+import { MessageSquare, List, Minimize } from "lucide-react";
 import Logo from "@/components/Logo";
 import { SurveyResponse, ProductEstimate, ContactFormData, Message } from "@/types/survey";
 import { TimingData } from "@/types/analytics";
